@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="ThemeMaker-wasm-wasi-2.1.2">
+    <output-path>$PROJECT_DIR$/build/libs</output-path>
+    <root id="archive" name="ThemeMaker-wasm-wasi-2.1.2.jar">
+      <element id="module-output" name="ThemeMaker.wasmWasiMain" />
+    </root>
+  </artifact>
+</component>
