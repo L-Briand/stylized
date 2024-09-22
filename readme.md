@@ -97,7 +97,7 @@ assertEquals(Color.GREEN, colors[green])
 
 ## Styles Customization
 
-Here's the good part. Styles can have a parent and inherit their values. Making variation of a style simple. Also,
+Here's the good part. Styles can have a parent and inherit their values. Making variation of a style simple.
 
 ```kotlin
 val lightTheme by style(from = colors) {
@@ -122,8 +122,8 @@ assertEquals(Color.BLUE, lightTheme["example2"])
 
 ## Style Composition
 
-If before it was good, now it's fun. Styles can have substyles. Substyles know of attributes of their parents if the
-context allows it. This
+If before it was good, now it's fun. Styles can have substyles. Substyles know the attributes of their parents, if the
+context allows it.
 
 ```kotlin
 val textStyle by attr()
