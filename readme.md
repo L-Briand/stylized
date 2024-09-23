@@ -42,9 +42,11 @@ kotlin {
 }
 ```
 
-# How to use
+# Examples
 
-The saying "An example is worth a thousand words" goes well here. So there it is.
+- [see a compose snippet](readme/compose.md)
+
+# Tutorial
 
 Color theming is the simplest way to understand the concept and principle. Let's assume a simple set of colors like so:
 
