@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="stylized-wasm-wasi-1.0.0">
+    <output-path>$PROJECT_DIR$/build/libs</output-path>
+    <root id="archive" name="stylized-wasm-wasi-1.0.0.jar">
+      <element id="module-output" name="stylized.wasmWasiMain" />
+    </root>
+  </artifact>
+</component>

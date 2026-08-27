@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     alias(libs.plugins.multiplatform)
+    alias(libs.plugins.serialization)
     id("maven-publish")
     id("signing")
 }
@@ -30,7 +31,6 @@ kotlin {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
     jvm {
-        withJava()
         withSourcesJar(true)
         testRuns.named("test") {
             executionTask.configure { useJUnitPlatform() }
@@ -57,7 +57,6 @@ kotlin {
 
     // Tier1
 
-    macosX64()
     macosArm64()
     iosSimulatorArm64()
     iosX64()
@@ -76,6 +75,7 @@ kotlin {
     iosArm64()
 
     // Tier3
+    macosX64()
     androidNativeArm32()
     androidNativeArm64()
     androidNativeX86()
@@ -87,6 +87,8 @@ kotlin {
         getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             }
         }
     }

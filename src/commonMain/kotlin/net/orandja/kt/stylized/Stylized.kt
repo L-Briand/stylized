@@ -1,53 +1,68 @@
 package net.orandja.kt.stylized
 
-import net.orandja.kt.stylized.Style.*
-import net.orandja.kt.stylized.dsl.StyleBuilder
-import net.orandja.kt.stylized.dsl.StyleGroupBuilder
-import net.orandja.kt.stylized.exceptions.ReferenceNotFoundException
+sealed interface Stylized {
 
-fun reference(vararg reference: Any) = StyleBuilder.reference(*reference)
-fun style(from: Style? = null, block: StyleGroupBuilder.() -> Unit) = StyleBuilder.style(from, block)
-fun attr() = StyleBuilder.attr()
-fun <T> attr(value: T) = StyleBuilder.attr(value)
-fun <T> attr(block: StyleBuilder.(Node) -> T) = StyleBuilder.attr(block)
-
-// Value resolver
-
-@Suppress("UNCHECKED_CAST")
-fun <T> Style.get(): T = this.accept(Node(this), ValueResolver) as T
-
-@Suppress("UNCHECKED_CAST")
-fun <T> Style.getOrNull(): T? = this.accept(Node(this), ValueResolver) as? T
-
-@Suppress("UNCHECKED_CAST")
-operator fun <T> Style.get(vararg reference: Any): T {
-    var node = Node(this)
-    return try {
-        node = node.resolve(*reference) ?: throw ReferenceNotFoundException(*reference, node = node)
-        node.current.accept(node, ValueResolver) as T
-    } catch (e: ClassCastException) {
-        throw ReferenceNotFoundException(reference, node = node, cause = e)
+    data object None : Stylized {
+        override fun <In, Out> accept(data: In, visitor: Visitor<In, Out>): Out = throw IllegalUseOfNone()
     }
-}
 
-@Suppress("UNCHECKED_CAST")
-fun <T> Style.getOrNull(vararg reference: Any): T? {
-    val node = Node(this).resolve(*reference)
-    return node?.current?.accept(node, ValueResolver) as? T
-}
+    /**
+     * Visitor method
+     * @see Visitor
+     */
+    fun <In, Out> accept(data: In, visitor: Visitor<In, Out>): Out
 
-private object ValueResolver : Visitor<Node, Any?> {
-    override fun <V> value(data: Node, value: Value<V>): Any? = value.get(data)
-    override fun group(data: Node, group: Group): Any = group
-    override fun reference(data: Node, reference: Reference): Any? = reference.get(data).accept(data, this)
-}
+    // Interface of stylized elements
 
-// Dereferencing
+    fun interface Value<out T> : Stylized {
+        fun get(node: Node): T
+        override fun <In, Out> accept(data: In, visitor: Visitor<In, Out>): Out =
+            visitor.value(data, this)
+    }
 
-fun Style.dereference(): Style = accept(Node(this), DeReferencer)
+    interface Style : Stylized {
+        fun get(node: Node, key: String): Stylized?
+        override fun <In, Out> accept(data: In, visitor: Visitor<In, Out>): Out =
+            visitor.style(data, this)
+    }
 
-private object DeReferencer : Visitor<Node, Style> {
-    override fun <V> value(data: Node, value: Value<V>): Style = value
-    override fun group(data: Node, group: Group): Style = group
-    override fun reference(data: Node, reference: Reference): Style = reference.get(data).accept(data, this)
+    interface Reference : Stylized {
+        fun get(node: Node): Stylized?
+        val identity: List<String>
+        override fun <In, Out> accept(data: In, visitor: Visitor<In, Out>): Out =
+            visitor.reference(data, this)
+    }
+
+    /**
+     * Visitor pattern for [Stylized] interface.
+     * The goal is to reduce the number of if checks with direct function calls to the detriment of the stack.
+     * This effectively speeds up the process if the visitor's already instantiated.
+     *
+     * A quick example; Instead of doing:
+     *
+     * ```kotlin
+     * when(style) {
+     *   is Value -> ...
+     *   is Style -> ...
+     *   ...
+     * }
+     * ```
+     *
+     * You do:
+     *
+     * ```kotlin
+     * style.accept(object : Visitor {
+     *   override fun value(value: Value<T>) = ...
+     *   override fun style(style: Style = ...
+     *   ...
+     * })
+     * ```
+     *
+     * It is (often ?) quicker to do it this way when dealing with trees.
+     */
+    interface Visitor<in In, out Out> {
+        fun <V> value(data: In, value: Value<V>): Out
+        fun style(data: In, style: Style): Out
+        fun reference(data: In, reference: Reference): Out
+    }
 }

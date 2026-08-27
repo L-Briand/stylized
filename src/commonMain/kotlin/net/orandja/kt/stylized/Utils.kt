@@ -1,31 +1,45 @@
 package net.orandja.kt.stylized
 
-import net.orandja.kt.stylized.Style.Reference
-import net.orandja.kt.stylized.dsl.StyleBuilder
-import net.orandja.kt.stylized.dsl.StyleGroupBuilder
-import kotlin.jvm.JvmInline
-import kotlin.properties.ReadOnlyProperty
-import kotlin.reflect.KProperty
+import net.orandja.kt.stylized.Stylized.Reference
+import net.orandja.kt.stylized.Stylized.Style
+import net.orandja.kt.stylized.Stylized.Value
+import net.orandja.kt.stylized.Stylized.Visitor
 
-@JvmInline
-private value class Box<T>(val value: T)
 
-internal fun <T> lazyReadOnlyProperty(init: (property: KProperty<*>) -> T): ReadOnlyProperty<Any?, T> =
-    LazyReadOnlyProperty(init)
+/** Follow the reference and return the value it points to */
+internal object ValueResolver : Visitor<Node, Any?> {
+    override fun <V> value(data: Node, value: Value<V>): Any? = value.get(data)
+    override fun style(data: Node, style: Style): Any = style
+    override fun reference(data: Node, reference: Reference): Any? = reference.get(data)?.accept(data, this)
+}
 
-/** [StyleGroupBuilder.set] needs to know if the value was created with [StyleBuilder.attr], [StyleBuilder.style] or [StyleBuilder.path] */
-internal interface StyleReadOnlyProperty<T> : ReadOnlyProperty<Any?, T>
+/** A [Stylized.Visitor] that search a value in a style given the provided key String. */
+internal object StyleResolver : Visitor<Pair<Node, String>, Stylized?> {
+    override fun <V> value(data: Pair<Node, String>, value: Value<V>): Stylized? = null
+    override fun style(data: Pair<Node, String>, style: Style): Stylized? =
+        style.get(data.first, data.second)
 
-private class LazyReadOnlyProperty<T>(val init: (property: KProperty<*>) -> T) : StyleReadOnlyProperty<T> {
-    private var box: Box<T>? = null
-    override fun getValue(thisRef: Any?, property: KProperty<*>): T {
-        if (box == null) box = Box(init(property))
-        return box!!.value
-    }
+    override fun reference(data: Pair<Node, String>, reference: Reference): Stylized? =
+        reference.get(data.first)?.accept(data, this)
+}
+
+/** A [Stylized.Visitor] that transform the visited [Stylized] to a node */
+internal object StyleAsNode : Visitor<Node, Node?> {
+    override fun <V> value(data: Node, value: Value<V>): Node = Node(value, data)
+    override fun style(data: Node, style: Style): Node = Node(style, data)
+    override fun reference(data: Node, reference: Reference): Node? =
+        reference.get(data)?.accept(data, this)
+}
+
+/** Like [ValueResolver] but returns the [Stylized] instead */
+internal object DeReferencer : Visitor<Node, Stylized?> {
+    override fun <V> value(data: Node, value: Value<V>): Stylized = value
+    override fun style(data: Node, style: Style): Stylized = style
+    override fun reference(data: Node, reference: Reference): Stylized? = reference.get(data)?.accept(data, this)
 }
 
 /**
- * Transform the given dotted string [str] to a sequence of string.
+ * Transform the given dotted string[str] to a sequence of string.
  * Example: `"key.value"` -> `["key", "value"]`
  *
  * - All values are trimmed of whitespaces. `" a. b .c "` -> `["a", "b", "c"]`
@@ -36,21 +50,24 @@ private class LazyReadOnlyProperty<T>(val init: (property: KProperty<*>) -> T) :
  * @param str The dotted string to parse
  * @return A sequence of trimmed strings separated by dots.
  */
-internal fun tokenizeDottedString(str: CharSequence): Sequence<String> = sequence {
-    if (str.isEmpty()) return@sequence
+internal fun tokenizeDottedString(str: CharSequence?, separator: Char = '.'): List<String> {
+    str ?: return emptyList()
+
+    if (str.isEmpty()) return emptyList()
 
     var index = 0
 
     // dismiss characters that do nothing.
     while (index < str.length && (str[index] == '.' || str[index].isWhitespace())) index += 1
-    if (index == str.length) return@sequence
+    if (index == str.length) return emptyList()
 
+    val result = ArrayList<String>(1)
     var wordStart: Int = -1
     var wordEnd = 0
 
     while (index < str.length) {
-        if (str[index] == '.') {
-            if (wordStart != -1) yield(str.substring(wordStart, wordEnd))
+        if (str[index] == separator) {
+            if (wordStart != -1) result += str.substring(wordStart, wordEnd)
             wordStart = -1
         } else if (!str[index].isWhitespace()) {
             if (wordStart == -1) wordStart = index
@@ -58,32 +75,7 @@ internal fun tokenizeDottedString(str: CharSequence): Sequence<String> = sequenc
         }
         index++
     }
-    if (wordStart != -1) yield(str.substring(wordStart, wordEnd))
-}
+    if (wordStart != -1) result += str.substring(wordStart, wordEnd)
 
-internal fun Sequence<String>.joinAsDottedString(): String = joinAsDottedString(iterator())
-internal fun Sequence<String>.sanitize(): Sequence<String> = flatMap { tokenizeDottedString(it) }
-internal fun Any?.extractStrings(): Sequence<String> = sequence { extractStrings(this@extractStrings) }
-
-private suspend fun SequenceScope<String>.extractStrings(value: Any?) {
-    when (value) {
-        null -> return
-        is Reference -> extractStrings(value.name())
-        is Array<*> -> for (n in value) extractStrings(n)
-        is Iterator<*> -> while(value.hasNext()) extractStrings(value.next())
-        is Iterable<*> -> for (n in value) extractStrings(n)
-        is Collection<*> -> for (n in value) extractStrings(n)
-        is List<*> -> for (n in value) extractStrings(n)
-        else -> yield(value.toString())
-    }
-}
-
-private fun joinAsDottedString(iterator: Iterator<String>): String {
-    if (!iterator.hasNext()) return ""
-    val sb = StringBuilder()
-    do {
-        sb.append(iterator.next())
-        sb.append('.')
-    } while (iterator.hasNext())
-    return sb.substring(0, sb.length - 1)
+    return result
 }

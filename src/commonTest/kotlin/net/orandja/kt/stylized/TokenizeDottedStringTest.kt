@@ -11,7 +11,7 @@ class TokenizeDottedStringTest {
     }
 
     private fun assertTokenize(expected: List<String>, string: String) {
-        assertContentEquals(expected, tokenizeDottedString(string).toList(), "Input '$string''")
+        assertContentEquals(expected, tokenizeDottedString(string).toList(), "Input '$string'")
     }
 
     private fun <T> List<T>.joinedStrings() = buildString { for (item in this@joinedStrings) append(item.toString()) }
